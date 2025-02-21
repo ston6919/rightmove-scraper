@@ -7,8 +7,8 @@ app = FastAPI()
 def search_rightmove_properties(location):
     # Start up our web browser
     with sync_playwright() as p:
-        # Launch the browser - setting headless=False so you can see what's happening
-        browser = p.chromium.launch(headless=False)
+        # Launch the browser - setting headless=True for deployment on Render
+        browser = p.chromium.launch(headless=True)
         
         # Open a new page (like opening a new tab)
         page = browser.new_page()
@@ -74,9 +74,7 @@ def search_rightmove_properties(location):
             return summary
             
         finally:
-            # Keep the browser open for 10 seconds so you can see what happened
-            time.sleep(10)
-            # Then close the browser
+            # Close the browser
             browser.close()
 
 @app.get("/search")
