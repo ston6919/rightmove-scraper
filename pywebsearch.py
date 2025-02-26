@@ -3,15 +3,19 @@ from playwright.sync_api import sync_playwright
 from fastapi import FastAPI
 import time
 
+# Set the Playwright browsers path environment variable
+os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "0"
+
 app = FastAPI()
 
 def search_rightmove_properties(location):
     # Start up our web browser
     with sync_playwright() as p:
-        # Launch the browser - using explicit executable path to avoid root issues
+        # Launch the browser - setting headless=True for deployment on Render
+        # Using channel="chrome" to avoid executable path issues
         browser = p.chromium.launch(
             headless=True,
-            executable_path=os.path.join(os.getcwd(), ".cache/ms-playwright/chromium-1155/chrome-linux/chrome")
+            channel="chrome"
         )
         
         # Open a new page (like opening a new tab)
@@ -24,9 +28,13 @@ def search_rightmove_properties(location):
             
             # Handle the cookie popup
             print("Looking for cookie popup...")
-            page.wait_for_selector('#onetrust-accept-btn-handler')
-            page.click('#onetrust-accept-btn-handler')
-            print("Accepted cookies")
+            try:
+                page.wait_for_selector('#onetrust-accept-btn-handler', timeout=10000)
+                page.click('#onetrust-accept-btn-handler')
+                print("Accepted cookies")
+            except Exception as e:
+                print(f"Cookie popup not found or couldn't be clicked: {e}")
+                # Continue anyway as the popup might not appear
             
             # Wait for the search box to appear
             print("Looking for search box...")
@@ -56,7 +64,7 @@ def search_rightmove_properties(location):
             
             # Wait for the results page to load
             print("Waiting for results...")
-            time.sleep(5)
+            page.wait_for_load_state('networkidle')
             
             # Get property listings
             properties = page.query_selector_all('.propertyCard')
@@ -75,19 +83,30 @@ def search_rightmove_properties(location):
                     
                     summary.append(f"Property {i+1}:\nPrice: {price_text}\nAddress: {address_text}\nDescription: {desc_text}\n")
             
+            if not summary:
+                return ["No properties found. The search might have failed or there are no results for this location."]
+                
             return summary
             
+        except Exception as e:
+            print(f"An error occurred: {str(e)}")
+            return [f"Error searching for properties: {str(e)}"]
         finally:
             # Close the browser
             browser.close()
 
+@app.get("/")
+def health_check():
+    return {"status": "ok", "message": "Service is running"}
+
 @app.get("/search")
 def search(location: str):
-    return search_rightmove_properties(location)
+    return {"results": search_rightmove_properties(location)}
 
 # Run the search locally
 if __name__ == "__main__":
     print("\nRunning Rightmove search locally...")
     results = search_rightmove_properties("Reading")
     print("\nHere's your property summary:")
-    print(results)
+    for result in results:
+        print(result)
