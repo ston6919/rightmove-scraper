@@ -1,3 +1,4 @@
+import os
 from playwright.sync_api import sync_playwright
 from fastapi import FastAPI
 import time
@@ -7,8 +8,11 @@ app = FastAPI()
 def search_rightmove_properties(location):
     # Start up our web browser
     with sync_playwright() as p:
-        # Launch the browser - setting headless=True for deployment on Render
-        browser = p.chromium.launch(headless=True)
+        # Launch the browser - using explicit executable path to avoid root issues
+        browser = p.chromium.launch(
+            headless=True,
+            executable_path=os.path.join(os.getcwd(), ".cache/ms-playwright/chromium-1155/chrome-linux/chrome")
+        )
         
         # Open a new page (like opening a new tab)
         page = browser.new_page()
